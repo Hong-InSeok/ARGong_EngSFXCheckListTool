@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
@@ -35,7 +36,7 @@ public class CheckListToolManager : MonoBehaviour
     public ResultPanelUI ResultPanel => resultPanelUI;
     public MissingFileCheckUI MissingFileCheck => missingFileCheckUI;
 
-    string BLOB_ROOT_PATH = "https://argame3.blob.core.windows.net/learning-resources-22/audio/{0}.mp3";
+    // string BLOB_ROOT_PATH = "https://argame3.blob.core.windows.net/learning-resources-22/audio/{0}.mp3";
 
     void Awake()
     {
@@ -59,9 +60,11 @@ public class CheckListToolManager : MonoBehaviour
         }
     }
 
-    public string GetSoundPath(string fileName)
+    public string GetSoundPath(string fileName, bool isSegmentedMode = false)
     {
-        return string.Format(BLOB_ROOT_PATH, fileName);
+        string basePath = isSegmentedMode ? "https://argame3.blob.core.windows.net/learning-resources-22/audio/" : "";
+        string extension = isSegmentedMode ? ".mp3" : "";
+        return $"{basePath}{fileName}{extension}";
     }
     
     public void CheckMissingFiles()
@@ -75,19 +78,20 @@ public class CheckListToolManager : MonoBehaviour
         List<AudioFileData> segmentedFileDataList = new List<AudioFileData>();
         foreach (string word in segmentedWords)
         {
-            segmentedFileDataList.Add(new AudioFileData(word));
+            segmentedFileDataList.Add(new AudioFileData(word, "segment"));
         }
-        StartCoroutine(CheckMissingFilesCoroutine(segmentedFileDataList));
+        StartCoroutine(CheckMissingFilesCoroutine(segmentedFileDataList, true));
     }
     
-    public void CheckAndPlayAudio(AudioFileData fileData)
+    public void CheckAndPlayAudio(AudioFileData fileData, bool isSegmentedMode = false)
     {
-        StartCoroutine(CheckAndPlayAudioCoroutine(fileData));
+        StartCoroutine(CheckAndPlayAudioCoroutine(fileData, isSegmentedMode));
     }
     
-    private IEnumerator CheckAndPlayAudioCoroutine(AudioFileData fileData)
+    private IEnumerator CheckAndPlayAudioCoroutine(AudioFileData fileData, bool isSegmentedMode = false)
     {
-        string blobUrl = GetSoundPath(fileData.fileName);
+        string blobUrl = GetSoundPath(fileData.filePath, isSegmentedMode);
+        Debug.Log($"Checking file: {blobUrl}");
         bool exists = false;
         
         using (UnityWebRequest request = UnityWebRequest.Head(blobUrl))
@@ -108,7 +112,7 @@ public class CheckListToolManager : MonoBehaviour
         Debug.Log($"File check: {fileData.fileName} - Exists: {exists}");
     }
     
-    private IEnumerator CheckMissingFilesCoroutine(List<AudioFileData> allFiles)
+    private IEnumerator CheckMissingFilesCoroutine(List<AudioFileData> allFiles, bool isSegmentedMode = false)
     {
         if (checkingProgressPopup != null)
         {
@@ -121,10 +125,10 @@ public class CheckListToolManager : MonoBehaviour
         
         foreach (AudioFileData fileData in allFiles)
         {
-            string blobUrl = GetSoundPath(fileData.fileName);
+            string blobUrl = isSegmentedMode ? GetSoundPath(fileData.fileName, true) : GetSoundPath(fileData.filePath);
             bool exists = false;
             
-            using (UnityWebRequest request = UnityWebRequest.Head(blobUrl))
+            using (UnityWebRequest request = UnityWebRequest.Get(blobUrl))
             {
                 yield return request.SendWebRequest();
                 

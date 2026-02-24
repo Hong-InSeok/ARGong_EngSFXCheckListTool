@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -260,10 +262,10 @@ namespace EngSFXCheckList.UI
             
             foreach (AudioFileData fileData in allFiles)
             {
-                if (!string.IsNullOrEmpty(fileData.fileName))
+                if (string.Equals(fileData.type, "sentence") && !string.IsNullOrEmpty(fileData.eng))
                 {
-                    string cleanFileName = fileData.fileName.Replace("\"", "").Trim();
-                    string[] words = cleanFileName.Split('_');
+                    // string cleanFileName = fileData.fileName.Replace("\"", "").Trim();
+                    string[] words = GetNameListOfSentencePartial(fileData.eng).ToArray();
                     foreach (string word in words)
                     {
                         string trimmedWord = word.Trim();
@@ -315,15 +317,17 @@ namespace EngSFXCheckList.UI
         
         private void OnSegmentedWordClicked(string word)
         {
-            AudioFileData fileData = new AudioFileData(word);
-            OnAudioFileItemClicked(fileData);
+            AudioFileData fileData = new AudioFileData(word, "segment");
+            fileData.eng = word;
+            fileData.filePath = word;
+            OnAudioFileItemClicked(fileData, true);
         }
         
-        private void OnAudioFileItemClicked(AudioFileData fileData)
+        private void OnAudioFileItemClicked(AudioFileData fileData, bool isSegmentedMode = false)
         {
             if (CheckListToolManager.Instance != null)
             {
-                CheckListToolManager.Instance.CheckAndPlayAudio(fileData);
+                CheckListToolManager.Instance.CheckAndPlayAudio(fileData, isSegmentedMode);
             }
         }
         
@@ -352,5 +356,211 @@ namespace EngSFXCheckList.UI
                 CheckListToolManager.Instance.GoogleSheets.OnError -= OnDataLoadError;
             }
         }
+
+        #region Partial Audio
+        
+        private static string[] units = { "zero", "one", "two", "three",  
+            "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",  
+            "twelve", "thirteen", "fourteen", "fifteen", "sixteen",  
+            "seventeen", "eighteen", "nineteen" };
+        private static string[] ones = {"first", "second", "third", "fourth", "fifth", 
+            "sixth", "seventh", "eighth", "ninth", "tenth", 
+            "eleventh", "twelfth", "thirteenth", "fourteenth", "fifteenth", 
+            "sixteenth", "seventeenth", "eighteenth", "nineteenth"};
+        private static string[] tens = { "", "", "twenty", "thirty", "forty",  
+            "fifty", "sixty", "seventy", "eighty", "ninety" };
+        
+        private static string vowels = "aeiou";
+        private static string semiVowels = "wy";
+        private static string consonants = "bcdfghjklmnpqrstvxz";
+
+        public static string ChangeExceptionPartial(string partial, bool isUsingGameZone = false)
+        {
+            if (partial == "a")
+            {
+                return "a_1571";
+            }
+            if (partial == "read_past")
+            {
+                return "red";
+            }
+            if (partial == "jeju-do")
+            {
+                return "jejudo";
+            }
+
+            if (partial == "p.e" || partial == "p.e.")
+            {
+                return "pe";
+            }
+
+            if (partial == "u.k" || partial == "u.k.")
+            {
+                return "uk";
+            }
+
+            if (partial == "u.s" || partial == "u.s.")
+            {
+                return "u_s";
+            }
+            
+            if (isUsingGameZone) return partial;
+            
+            if (IsTimeString(partial))
+            {
+                return GetTimeString(partial);
+            }
+
+            if (CheckIsNumber(partial.Last()))
+            {
+                return GetNumberWord(int.Parse(partial, NumberStyles.AllowThousands));
+            }
+
+            return partial;
+        }
+        
+        public static bool IsTimeString(string word)
+        {
+            return word.Length > 3 && word.Contains(":");
+        }
+        
+        public static string GetTimeString(string word, bool isForPron = false)
+        {
+            string[] numbers = word.Split(':');
+            for (int i = 0; i < numbers.Length; i++)
+            {
+                numbers[i] = numbers[i].Replace(".", "").Replace("?", "").Replace("!", "").Replace(",", "");
+            }
+            string hour = GetNumberWord(int.Parse(numbers[0]));
+            string minute = int.Parse(numbers[1]) > 0 ? (isForPron ? "_" : " ") + GetNumberWord(int.Parse(numbers[1])) : "";
+            // string result = isForPron? $"{hour} {GetNumberWord(int.Parse(numbers[1]))}" : $"{GetNumberWord(int.Parse(numbers[0]))}_{GetNumberWord(int.Parse(numbers[1]))}";
+            string result = hour + minute;
+            return string.IsNullOrWhiteSpace(result) ? "" : result;
+        }
+        
+        public static string GetNumberWord(int i)
+        {
+            if (i < 20)  
+            {  
+                return units[i];
+            }
+            if (i < 100)  
+            {  
+                return tens[i / 10] + ((i % 10 > 0) ? $"_{GetNumberWord(i % 10)}" : "");  
+            }  
+            if (i < 1000)  
+            {  
+                return units[i / 100] + "_hundred" + (i % 100 > 0 ? $"_{GetNumberWord(i % 100)}" : "");
+                // result = units[i / 100] + "_hundred" + ((i % 100 > 0) ? $"_{GetNumberWord(i & 100)}" : "");
+            }  
+            if (i < 1000000)  
+            {           
+                return GetNumberWord(i / 1000) + "_thousand" + (i % 1000 > 0 ? $"_{GetNumberWord(i % 1000)}" : "");
+            }
+
+            // result = forPron ? result.Replace('_', ' ') : result;
+            
+            return "";
+        }
+        
+        public static bool CheckIsNumber(char character)
+        {
+            string numbers = "0123456789";
+            return numbers.Contains(character.ToString());
+        }
+
+        public static bool CheckIsNumber(string character)
+        {
+            return character.Length == 1 && CheckIsNumber(character[0]);
+        }
+        
+        public static bool CheckIsAlphabet(char character)
+        {
+            string alphabets = vowels + semiVowels + consonants;
+            return alphabets.Contains(character.ToString().ToLower());
+        }
+
+        public static bool CheckIsAlphabet(string character)
+        {
+            return character.Length == 1 && CheckIsAlphabet(character.ToLower()[0]);
+        }
+        
+        public static List<string> GetNameListOfSentencePartial(string sentence)
+        {
+            // sentence = sentence.Trim() == "I read many books." ? "I read_past many books." : sentence.Trim();
+            // sentence = sentence.Trim() == "My favorite song is \"Lemon Tree.\"" ? "My favorite song is Lemon Tree." : sentence.Trim();
+
+            if (sentence == "My favorite song is \"Lemon Tree.\"")
+            {
+                Debug.Log("Debugging sentence: " + sentence);
+            }
+            
+            string[] partialSentence = sentence.ToLower().Split(' ');
+            var nullPartialList = new List<string>();
+
+            for (int i = 0; i < partialSentence.Length; i++)
+            {
+                partialSentence[i] = GetSentencePartial(sentence, partialSentence[i]);
+                if (!CheckIsAlphabet(partialSentence[i].Last()) && !CheckIsNumber(partialSentence[i].Last()))
+                {
+                    partialSentence[i] = partialSentence[i].Substring(0, partialSentence[i].Length - 1);
+                }
+            }
+
+            for (int i = 0; i < partialSentence.Length; i++)
+            {
+                nullPartialList.Add(Regex.Replace(ChangeExceptionPartial(partialSentence[i]), @"[^a-zA-Z0-9_]", "_"));
+            }
+
+            return nullPartialList;
+        }
+        
+        public static string GetSentencePartial(string sentence, string partial)
+        {
+            string key = partial.Trim().ToLower();
+            if (!CheckIsAlphabet(key.Last()) && !CheckIsNumber(key.Last()))
+            {
+                key = key.Substring(0, key.Length - 1);
+            }
+
+            if ((sentence.Trim() == "I read many books." || sentence.Trim() == "I read many books about space.") && key == "read")
+            {
+                key = "read_past";
+            }
+
+            if (sentence.Trim() == "My favorite song is \"Lemon Tree.\"" && key == "\"lemon")
+            {
+                key = "lemon";
+            }
+            
+            if (sentence.Trim() == "My favorite song is \"Lemon Tree.\"" && key == "tree.\"")
+            {
+                key = "tree";
+            }
+
+            if (sentence.Trim() == "I saw the musical 'The Lion King.'" && key == "'the")
+            {
+                key = "the";
+            }
+
+            if (sentence.Trim() == "I saw the musical 'The Lion King.'" && key == "king.'")
+            {
+                key = "king";
+            }
+
+            if (sentence.Trim() == "I read the book 'Harry Potter.'" && key == "'harry")
+            {
+                key = "harry";
+            }
+
+            if (sentence.Trim() == "I read the book 'Harry Potter.'" && key == "potter.'")
+            {
+                key = "potter";
+            }
+
+            return key;
+        }
+
+        #endregion
     }
 }

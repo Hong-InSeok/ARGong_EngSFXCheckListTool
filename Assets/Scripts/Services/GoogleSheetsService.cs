@@ -12,10 +12,13 @@ namespace EngSFXCheckList.Services
         // 구글 시트 링크
         // https://docs.google.com/spreadsheets/d/1Qh1FvPbeIMb2NHPIB6XNAPIASOmTW7OYfRd89hfyo3A/edit?gid=0#gid=0
 
-        private const string SHEET_ID = "1Qh1FvPbeIMb2NHPIB6XNAPIASOmTW7OYfRd89hfyo3A";
+        // private const string SHEET_ID = "1Qh1FvPbeIMb2NHPIB6XNAPIASOmTW7OYfRd89hfyo3A";
+        private const string SHEET_ID = "1gTkHjA7ZNsvd5kjCOA5W8ukb3HcNErzOGzTz-XZBL00";
         private const string GID = "0";
         private const string NO_COLUMN = "No";
         private const string FILENAME_COLUMN = "FileName";
+        private const string CATEGORY_COLUMN = "category";
+        private const string ENG_COLUMN = "Eng";
         
         public event Action<List<AudioFileData>> OnDataLoaded;
         public event Action<string> OnError;
@@ -60,6 +63,9 @@ namespace EngSFXCheckList.Services
             string[] headers = lines[0].Split(',');
             int noColumnIndex = -1;
             int audioColumnIndex = -1;
+            int filePathIndex = 11;
+            int categoryIndex = -1;
+            int engColumnIndex = -1;
 
             for (int i = 0; i < headers.Length; i++)
             {
@@ -72,6 +78,14 @@ namespace EngSFXCheckList.Services
                 else if (header.Equals(FILENAME_COLUMN, StringComparison.OrdinalIgnoreCase))
                 {
                     audioColumnIndex = i;
+                }
+                else if (header.Equals(CATEGORY_COLUMN, StringComparison.OrdinalIgnoreCase))
+                {
+                    categoryIndex = i;
+                }
+                else if (header.Equals(ENG_COLUMN, StringComparison.OrdinalIgnoreCase))
+                {
+                    engColumnIndex = i;
                 }
             }
 
@@ -107,6 +121,9 @@ namespace EngSFXCheckList.Services
                                 fileData.no = no;
                             }
                         }
+                        fileData.eng = columns[engColumnIndex].Trim().Trim('"');
+                        fileData.type = columns[categoryIndex];
+                        fileData.filePath = columns[filePathIndex];
 
                         allAudioFiles.Add(fileData);
                     }

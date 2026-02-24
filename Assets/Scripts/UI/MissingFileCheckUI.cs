@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using TMPro;
 using EngSFXCheckList.Data;
@@ -57,7 +58,7 @@ namespace EngSFXCheckList.UI
                 {
                     listItem.UpdateContent(index);
                     AudioFileData fileData = missingFiles[index];
-                    listItem.SetData(index + 1, fileData.fileName);
+                    listItem.SetData(index + 1, Path.GetFileName(fileData.filePath));
                 }
             }
         }
